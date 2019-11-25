@@ -1,0 +1,24 @@
+Invoke-SeClick  {Send-SeClick  (with alias SeClick)}
+  Element can be passed by position (first)
+  JavaScriptClick can be abreviated JS 
+  Driver is ignored  (element.wrapedDriver used instead)
+  Added Sleep Seconds 
+
+Find-seElement {Get-SeElement alias seElement}
+    a BY parameter with possible values "CssSelector", "Name", "Id", "ClassName", "LinkText", "PartialLinkText", "TagName", "XPath"
+    combined witha "Selection" parameter which holds the value replaces the 8 parameters with those names and parameter Sets 
+    Timeout is 0 by default and wait has been dropped. Specify a timeout of 30 instead of -wait, and timeout of 5 instead of -wait -timeout 5
+    Element and Driver are merged as "target" which has aliases of Element and driver 
+
+Enter-SeURL {Open-SeURL   ... Alias tbd}  
+  Url is first on the commandline and mandatory
+  Driver is renamed target, with alias "Driver", and will come from $Global:SeDriver 
+  Throws an error if no driver passed or found from Global var 
+
+New {New-SeScreenShot alias tbd} . Merges Invoke-ScreenShot and SaveSeScreenShot 
+   Can pass -path, 
+            -passthru (Alias PT)
+            -path & -passthru
+       or   -AsBase64 
+   Driver is renamed target, with alias "Driver", and will come from $Global:SeDriver 
+   Throws an error if no driver passed or found from Global var 
