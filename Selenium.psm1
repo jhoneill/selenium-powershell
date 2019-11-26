@@ -1,6 +1,9 @@
 [System.Reflection.Assembly]::LoadFrom("$PSScriptRoot\assemblies\WebDriver.dll")
 [System.Reflection.Assembly]::LoadFrom("$PSScriptRoot\assemblies\WebDriver.Support.dll")
 
+$Script:SeKeys = [OpenQA.Selenium.Keys] | Get-Member -MemberType Property -Static | 
+        Select-Object -Property Name, @{N = "ObjectString"; E = { "[OpenQA.Selenium.Keys]::$($_.Name)" } }
+
 if($IsLinux){
     $AssembliesPath = "$PSScriptRoot/assemblies/linux"
 }
@@ -27,49 +30,48 @@ if($IsLinux -or $IsMacOS){
     }
 }
 
-function Validate-URL{
+function ValidateURL{
     param(
         [Parameter(Mandatory=$true)]$URL
     )
     $Out = $null
-    [uri]::TryCreate($URL,[System.UriKind]::Absolute, [ref]$Out)
+    [uri]::TryCreate($_,[System.UriKind]::Absolute, [ref]$Out)
 }
 
 function Start-SeChrome {
+    [cmdletbinding(DefaultParameterSetName='default')]
+    [Alias('Chrome')]
     Param(
+        [ValidateScript({
+            $Out = $null
+            write-host $_
+            if ([uri]::TryCreate($_,[System.UriKind]::Absolute, [ref]$Out)) {return $true}
+            else { throw 'Incorrect StartURL please make sure the URL starts with http:// or https://'}
+        })]
+        [Parameter(Position=0)]
+        [string]$StartURL,
         [Parameter(Mandatory = $false)]
         [array]$Arguments,
         [switch]$HideVersionHint,
-        [string]$StartURL,
         [System.IO.FileInfo]$DefaultDownloadPath,
         [System.IO.FileInfo]$ProfileDirectoryPath,
+        [Parameter(DontShow)]
         [bool]$DisableBuiltInPDFViewer=$true,
+        [switch]$EnablePDFViewer,
         [switch]$Headless,
+        [Alias('PrivateBrowsing')]
         [switch]$Incognito,
+        [parameter(ParameterSetName='Min',Mandatory=$true)]        
         [switch]$Maximized,
+        [parameter(ParameterSetName='Max',Mandatory=$true)]        
         [switch]$Minimized,
+        [parameter(ParameterSetName='Ful',Mandatory=$true)]        
         [switch]$Fullscreen,
-        [System.IO.FileInfo]$ChromeBinaryPath
+        [System.IO.FileInfo]$ChromeBinaryPath,
+        [switch]$AsDefaultDriver
     )
 
-    BEGIN{
-        if($Maximized -ne $false -and $Minimized -ne $false){
-            throw 'Maximized and Minimized may not be specified together.'
-        }
-        elseif($Maximized -ne $false -and $Fullscreen -ne $false){
-            throw 'Maximized and Fullscreen may not be specified together.'
-        }
-        elseif($Minimized -ne $false -and $Fullscreen -ne $false){
-            throw 'Minimized and Fullscreen may not be specified together.'
-        }
-
-        if($StartURL){
-            if(!(Validate-URL -URL $StartURL)){
-                throw 'Incorrect StartURL please make sure the URL starts with http:// or https://'
-            }
-        }
-    }
-    PROCESS{
+    process{
         $Chrome_Options = New-Object -TypeName "OpenQA.Selenium.Chrome.ChromeOptions"
     
         if($DefaultDownloadPath){
@@ -87,8 +89,7 @@ function Start-SeChrome {
             $Chrome_Options.BinaryLocation ="$ChromeBinaryPath"
         }
         
-
-        if($DisableBuiltInPDFViewer){
+        if($DisableBuiltInPDFViewer -and -not $EnablePDFViewer){
             $Chrome_Options.AddUserProfilePreference('plugins', @{'always_open_pdf_externally' =  $true;})
         }
         
@@ -125,67 +126,116 @@ function Start-SeChrome {
             $Driver = New-Object -TypeName "OpenQA.Selenium.Chrome.ChromeDriver" -ArgumentList $Chrome_Options 
         }
 
-        if($Minimized -and $Driver){
-            $driver.Manage().Window.Minimize();
+        if(-not $Driver) {Write-Warning "Web driver was not created"; return} 
+        
+        if($Minimized){
+            $Driver.Manage().Window.Minimize();
         }
 
-        if($Headless -and $DefaultDownloadPath -and $Driver){
+        if($Headless -and $DefaultDownloadPath){
             $HeadlessDownloadParams = New-Object 'system.collections.generic.dictionary[[System.String],[System.Object]]]'
             $HeadlessDownloadParams.Add('behavior', 'allow')
             $HeadlessDownloadParams.Add('downloadPath', $DefaultDownloadPath.FullName)
             $Driver.ExecuteChromeCommand('Page.setDownloadBehavior', $HeadlessDownloadParams)
         }
 
-        if($StartURL -and $Driver){
-            Enter-SeUrl -Driver $Driver -Url $StartURL
+        if($StartURL) {$Driver.Navigate().GoToUrl($StartURL)}
+
+        if($AsDefaultDriver) {
+            if ($Global:SeDriver) {$Global:SeDriver.Dispose()}
+            $Global:SeDriver = $Driver
         }
-    }
-    END{
-        return $Driver
+        else {$Driver}       
     }
 }
 
 function Start-SeInternetExplorer {
+    [Alias('InternetExplorer')]
+    param(
+        [ValidateScript({
+            $Out = $null
+            if ([uri]::TryCreate($_,[System.UriKind]::Absolute, [ref]$Out)) {return $true}
+            else { throw 'Incorrect StartURL please make sure the URL starts with http:// or https://'}
+        })]
+        [Parameter(Position=0)]
+        [string]$StartURL,
+        [switch]$AsDefaultDriver
+    )
     $InternetExplorer_Options = New-Object -TypeName "OpenQA.Selenium.IE.InternetExplorerOptions"
     $InternetExplorer_Options.IgnoreZoomLevel = $true
-    New-Object -TypeName "OpenQA.Selenium.IE.InternetExplorerDriver" -ArgumentList $InternetExplorer_Options 
+    $Driver = New-Object -TypeName "OpenQA.Selenium.IE.InternetExplorerDriver" -ArgumentList $InternetExplorer_Options 
+    
+    if(-not $Driver) {Write-Warning "Web driver was not created"; return}  
+    
+    $Driver.Manage().Timeouts().ImplicitWait = [TimeSpan]::FromSeconds(10)
+    if($StartURL)  {$Driver.Navigate().GoToUrl($StartURL) }
+            
+    if($AsDefaultDriver) {
+        if ($Global:SeDriver) {$Global:SeDriver.Dispose()}
+        $Global:SeDriver = $Driver
+    }
+    else {$Driver}
 }
 
 function Start-SeEdge {
-    New-Object -TypeName "OpenQA.Selenium.Edge.EdgeDriver"
+    [cmdletbinding(DefaultParameterSetName='default')]
+    [Alias('MSEdge')]
+    param(
+        [ValidateScript({
+            $Out = $null
+            if ([uri]::TryCreate($_,[System.UriKind]::Absolute, [ref]$Out)) {return $true}
+            else { throw 'Incorrect StartURL please make sure the URL starts with http:// or https://'}
+        })]
+        [Parameter(Position=0)]
+        [string]$StartURL,
+        [parameter(ParameterSetName='Min',Mandatory=$true)]        
+        [switch]$Maximized,
+        [parameter(ParameterSetName='Max',Mandatory=$true)]        
+        [switch]$Minimized,
+        [switch]$AsDefaultDriver
+    )
+    $Driver = New-Object -TypeName "OpenQA.Selenium.Edge.EdgeDriver"
+    
+    if(-not $Driver) {Write-Warning "Web driver was not created"; return}  
+    $Driver.Manage().Timeouts().ImplicitWait = [TimeSpan]::FromSeconds(10)
+    if($Minimized) {$Driver.Manage().Window.Minimize()    }
+    if($Maximized) {$Driver.Manage().Window.Maximize()    }        
+    if($StartURL)  {$Driver.Navigate().GoToUrl($StartURL) }
+            
+    if($AsDefaultDriver) {
+        if ($Global:SeDriver) {$Global:SeDriver.Dispose()}
+        $Global:SeDriver = $Driver
+    }
+    else {$Driver}
 }
 
 function Start-SeFirefox {
+    [cmdletbinding(DefaultParameterSetName='default')]
+    [Alias('Firefox')]
     param(
-        [array]$Arguments,
+        [ValidateScript({
+            $Out = $null
+            if ([uri]::TryCreate($_, [System.UriKind]::Absolute, [ref]$Out)) {return $true}
+            else { throw 'Incorrect StartURL please make sure the URL starts with http:// or https://'}
+        })]
+        [Parameter(Position=0)]        
         [string]$StartURL,
+        [array]$Arguments,
         [System.IO.FileInfo]$DefaultDownloadPath,
         [switch]$Headless,
+        [alias('Incognito')]
         [switch]$PrivateBrowsing,
+        [parameter(ParameterSetName='Min',Mandatory=$true)]        
         [switch]$Maximized,
+        [parameter(ParameterSetName='Max',Mandatory=$true)]        
         [switch]$Minimized,
+        [parameter(ParameterSetName='Ful',Mandatory=$true)]        
         [switch]$Fullscreen,
-        [switch]$SuppressLogging
+        [switch]$SuppressLogging,
+        [switch]$AsDefaultDriver
+        
     )
-
-    BEGIN{
-        if($Maximized -ne $false -and $Minimized -ne $false){
-            throw 'Maximized and Minimized may not be specified together.'
-        }
-        elseif($Maximized -ne $false -and $Fullscreen -ne $false){
-            throw 'Maximized and Fullscreen may not be specified together.'
-        }
-        elseif($Minimized -ne $false -and $Fullscreen -ne $false){
-            throw 'Minimized and Fullscreen may not be specified together.'
-        }
-
-        if($StartURL){
-            if(!(Validate-URL -URL $StartURL)){
-                throw 'Incorrect StartURL please make sure the URL starts with http:// or https://'
-            }
-        }
-    }
-    PROCESS{
+    process{
         $Firefox_Options = New-Object -TypeName "OpenQA.Selenium.Firefox.FirefoxOptions"
 
         if($Headless){
@@ -219,42 +269,52 @@ function Start-SeFirefox {
         else{
             $Driver = New-Object -TypeName "OpenQA.Selenium.Firefox.FirefoxDriver" -ArgumentList $Firefox_Options
         }
-
-        if($Driver){
-            $Driver.Manage().Timeouts().ImplicitWait = [TimeSpan]::FromSeconds(10)
+        if(-not $Driver) {Write-Warning "Web driver was not created"; return}
+        
+        $Driver.Manage().Timeouts().ImplicitWait = [TimeSpan]::FromSeconds(10)
+        if($Minimized) {$Driver.Manage().Window.Minimize()    }
+        if($Maximized) {$Driver.Manage().Window.Maximize()    }
+        if($Fullscreen){$Driver.Manage().Window.FullScreen()  }
+        if($StartURL)  {$Driver.Navigate().GoToUrl($StartURL) }
+            
+        if($AsDefaultDriver) {
+            if ($Global:SeDriver) {$Global:SeDriver.Dispose()}
+            $Global:SeDriver = $Driver
+        }
+        else {$Driver}
         }
 
-        if($Minimized -and $Driver){
-            $Driver.Manage().Window.Minimize()
-        }
-
-        if($Maximized -and $Driver){
-            $Driver.Manage().Window.Maximize()
-        }
-
-        if($Fullscreen -and $Driver){
-            $Driver.Manage().Window.FullScreen()
-        }
-
-        if($StartURL -and $Driver){
-            Enter-SeUrl -Driver $Driver -Url $StartURL
-        }
-    }
-    END{
-        return $Driver
-    }
 }
 
 function Stop-SeDriver {
-    param($Driver) 
-
-    $Driver.Dispose()
+    param(
+        [Parameter(Mandatory=$true, ValueFromPipeline=$true, position=0,ParameterSetName='Driver')]     
+        $Driver,
+        [Parameter(Mandatory=$true, ParameterSetName='Default')]     
+        [switch]$Default
+    ) 
+    if ($Driver) {$Driver.Dispose()}
+    elseif ($Default) {$Global:SeDriver.Dispose()}
 }
 
 function Enter-SeUrl {
     param($Driver, $Url)
 
     $Driver.Navigate().GoToUrl($Url)
+}
+
+function Open-SeUrl {
+    [Alias('SeNavigate')]
+    param(
+        [Parameter(Mandatory=$true, position=0)]    
+        [string]$Url,
+        [Alias("Driver")]
+        $Target = $Global:SeDriver 
+    )
+    if(-not $Target -is [OpenQA.Selenium.Remote.RemoteWebDriver]) {
+        throw "No valid driver was provided. "
+    }
+    else {$Target.Navigate().GoToUrl($Url) }
 }
 
 function Find-SeElement {
@@ -284,15 +344,15 @@ function Find-SeElement {
         )
 
 
-    Process {
+    process {
 
-        if ($Driver -ne $null -and $Element -ne $null) {
+        if($null -ne $Driver  -and $null -ne  $Element) {
             throw "Driver and Element may not be specified together."
         }
-        elseif ($Driver -ne $Null) {
+        elseif($null -ne $Driver) {
             $Target = $Driver
         }
-        elseif ($Element -ne $Null) {
+        elseif(-ne $Null $Element) {
             $Target = $Element
         }
         else {
@@ -300,35 +360,35 @@ function Find-SeElement {
         }
 
         if($Wait){
-            if ($PSCmdlet.ParameterSetName -eq "ByName") {
+            if($PSCmdlet.ParameterSetName -eq "ByName") {
                 $TargetElement = [OpenQA.Selenium.By]::Name($Name)
             }
 
-            if ($PSCmdlet.ParameterSetName -eq "ById") {
+            if($PSCmdlet.ParameterSetName -eq "ById") {
                 $TargetElement = [OpenQA.Selenium.By]::Id($Id)
             }
             
-            if ($PSCmdlet.ParameterSetName -eq "ByLinkText") {
+            if($PSCmdlet.ParameterSetName -eq "ByLinkText") {
                 $TargetElement = [OpenQA.Selenium.By]::LinkText($LinkText)
             }
 
-            if ($PSCmdlet.ParameterSetName -eq "ByPartialLinkText") {
+            if($PSCmdlet.ParameterSetName -eq "ByPartialLinkText") {
                 $TargetElement = [OpenQA.Selenium.By]::PartialLinkText($PartialLinkText)
             }
 
-            if ($PSCmdlet.ParameterSetName -eq "ByClassName") {
+            if($PSCmdlet.ParameterSetName -eq "ByClassName") {
                 $TargetElement = [OpenQA.Selenium.By]::ClassName($ClassName)
             }
 
-            if ($PSCmdlet.ParameterSetName -eq "ByTagName") {
+            if($PSCmdlet.ParameterSetName -eq "ByTagName") {
                 $TargetElement = [OpenQA.Selenium.By]::TagName($TagName)
             }
             
-            if ($PSCmdlet.ParameterSetName -eq "ByXPath") {
+            if($PSCmdlet.ParameterSetName -eq "ByXPath") {
                 $TargetElement = [OpenQA.Selenium.By]::XPath($XPath)
             }
 
-            if ($PSCmdlet.ParameterSetName -eq "ByCss") {
+            if($PSCmdlet.ParameterSetName -eq "ByCss") {
                 $TargetElement = [OpenQA.Selenium.By]::CssSelector($Css)
             }
             
@@ -337,38 +397,70 @@ function Find-SeElement {
             $WebDriverWait.Until($Condition)
         }
         else{
-            if ($PSCmdlet.ParameterSetName -eq "ByName") {
+            if($PSCmdlet.ParameterSetName -eq "ByName") {
                 $Target.FindElements([OpenQA.Selenium.By]::Name($Name))
             }
 
-            if ($PSCmdlet.ParameterSetName -eq "ById") {
+            if($PSCmdlet.ParameterSetName -eq "ById") {
                 $Target.FindElements([OpenQA.Selenium.By]::Id($Id))
             }
 
-            if ($PSCmdlet.ParameterSetName -eq "ByLinkText") {
+            if($PSCmdlet.ParameterSetName -eq "ByLinkText") {
                 $Target.FindElements([OpenQA.Selenium.By]::LinkText($LinkText))
             }
 
-            if ($PSCmdlet.ParameterSetName -eq "ByPartialLinkText") {
+            if($PSCmdlet.ParameterSetName -eq "ByPartialLinkText") {
                 $Target.FindElements([OpenQA.Selenium.By]::PartialLinkText($PartialLinkText))
             }
 
-            if ($PSCmdlet.ParameterSetName -eq "ByClassName") {
+            if($PSCmdlet.ParameterSetName -eq "ByClassName") {
                 $Target.FindElements([OpenQA.Selenium.By]::ClassName($ClassName))
             }
 
-            if ($PSCmdlet.ParameterSetName -eq "ByTagName") {
+            if($PSCmdlet.ParameterSetName -eq "ByTagName") {
                 $Target.FindElements([OpenQA.Selenium.By]::TagName($TagName))
             }
 
-            if ($PSCmdlet.ParameterSetName -eq "ByXPath") {
+            if($PSCmdlet.ParameterSetName -eq "ByXPath") {
                 $Target.FindElements([OpenQA.Selenium.By]::XPath($XPath))
             }
             
-            if ($PSCmdlet.ParameterSetName -eq "ByCss") {
+            if($PSCmdlet.ParameterSetName -eq "ByCss") {
                 $Target.FindElements([OpenQA.Selenium.By]::CssSelector($Css))
             }
         }
+    }
+}
+
+function Get-SeElement {
+    param(
+        [Parameter(Position=0)]
+        [ValidateSet("CssSelector", "Name", "Id", "ClassName", "LinkText", "PartialLinkText", "TagName", "XPath")]
+        [string]$By = "XPath",
+        
+        [Parameter(Position=1,Mandatory=$true)]
+        [string]$Selection,
+
+        [Parameter(Position=2)]
+        [Int]$Timeout = 0,
+        
+        [Parameter(Position=3,ValueFromPipeline=$true)]
+        [Alias('Element','Driver')]
+        $Target = $Global:SeDriver    
+    )
+    process {
+        if($TimeOut -and $Target -is [OpenQA.Selenium.Remote.RemoteWebDriver]) { 
+            $TargetElement = [OpenQA.Selenium.By]::$By($Selection)
+            $WebDriverWait = New-Object -TypeName OpenQA.Selenium.Support.UI.WebDriverWait($Driver, (New-TimeSpan -Seconds $Timeout))
+            $Condition     = [OpenQA.Selenium.Support.UI.ExpectedConditions]::ElementExists($TargetElement)
+            $WebDriverWait.Until($Condition)
+        }
+        elseif ($Target -is [OpenQA.Selenium.Remote.RemoteWebElement] -or 
+                $Target -is [OpenQA.Selenium.Remote.RemoteWebDriver]) {
+            if ($Timeout) {Write-warning}
+            $Target.FindElements([OpenQA.Selenium.By]::$By($Selection))
+        }
+        else {throw "No valid target was provided."}
     }
 }
 
@@ -382,7 +474,7 @@ function Invoke-SeClick {
         $Driver
     )
 
-    if ($JavaScriptClick) {
+    if($JavaScriptClick) {
         $Driver.ExecuteScript("arguments[0].click()", $Element)
     }
     else {
@@ -391,25 +483,51 @@ function Invoke-SeClick {
 
 }
 
-function Get-SeKeys {
-    
+function Send-SeClick {
+    [alias('SeClick')]
+    param(
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true,Position=0)]
+        [OpenQA.Selenium.IWebElement]$Element,
+        [Alias('JS')]
+        [Switch]$JavaScriptClick,
+        $SleepSeconds = 0 ,
+        [Parameter(DontShow)]
+        $Driver
+    ) 
+    Process {
+        if ($JavaScriptClick) { $Element.WrappedDriver.ExecuteScript("arguments[0].click()", $Element) }
+        else                  { $Element.Click() }
+        if ($SleepSeconds)    {Start-Sleep -Seconds $SleepSeconds}
+    }
+}
+
+function Get-SeKeys {   
     [OpenQA.Selenium.Keys] | Get-Member -MemberType Property -Static | Select-Object -Property Name, @{N = "ObjectString"; E = { "[OpenQA.Selenium.Keys]::$($_.Name)" } }
 }
 
 function Send-SeKeys {
-    param([OpenQA.Selenium.IWebElement]$Element, [string]$Keys)
-    
-    foreach ($Key in @(Get-SeKeys).Name) {
+    [Alias('SeType')]
+    param(
+        [Parameter(Mandatory=$true,Position=0)]
+        [OpenQA.Selenium.IWebElement]$Element, 
+        [Parameter(Mandatory=$true,Position=1)]
+        [string]$Keys
+    )
+    foreach ($Key in $Script:SeKeys.Name) {
         $Keys = $Keys -replace "{{$Key}}", [OpenQA.Selenium.Keys]::$Key
     }
-    
     $Element.SendKeys($Keys)
 }
 
 function Get-SeCookie {
-    param($Driver)
-
-    $Driver.Manage().Cookies.AllCookies.GetEnumerator()
+    param(
+        [Alias("Driver")]
+        $Target = $Global:SeDriver 
+    )
+    if(-not $Target -is [OpenQA.Selenium.Remote.RemoteWebDriver]) {
+        throw "No valid driver was provided. "
+    }
+    $Target.Manage().Cookies.AllCookies.GetEnumerator()
 }
 
 function Remove-SeCookie {
@@ -428,15 +546,17 @@ function Remove-SeCookie {
 }
 
 function Set-SeCookie {
+    [cmdletbinding()]
     param(
-        [ValidateNotNull()]$Driver, 
         [string]$Name,
         [string]$Value,
         [string]$Path,
         [string]$Domain,
-        $ExpiryDate
+        $ExpiryDate,
+        [Alias("Driver")]
+        $Target = $Global:SeDriver 
     )
-
+        
     <# Selenium Cookie Information
     Cookie(String, String)
     Initializes a new instance of the Cookie class with a specific name and value.
@@ -447,13 +567,16 @@ function Set-SeCookie {
     Cookie(String, String, String, String, Nullable<DateTime>)
     Initializes a new instance of the Cookie class with a specific name, value, domain, path and expiration date. 
     #>
-    Begin{
-        if($ExpiryDate -ne $null -and $ExpiryDate.GetType().Name -ne 'DateTime'){
+    begin {
+        if(-not $Target -is [OpenQA.Selenium.Remote.RemoteWebDriver]) {
+            throw "No valid driver was provided. "
+        }
+        if($null -ne $ExpiryDate -and $ExpiryDate.GetType().Name -ne 'DateTime'){
             throw '$ExpiryDate can only be $null or TypeName: System.DateTime'
         }
     }
 
-    Process {
+    process {
         if($Name -and $Value -and (!$Path -and !$Domain -and !$ExpiryDate)){
             $cookie = New-Object -TypeName OpenQA.Selenium.Cookie -ArgumentList $Name,$Value
         }
@@ -494,17 +617,22 @@ function Get-SeElementAttribute {
         [Parameter(Mandatory = $true)]
         [string]$Attribute
     )
-
-    Process {
+    process {
         $Element.GetAttribute($Attribute)
     }   
 }
 
 function Invoke-SeScreenshot {
-    param($Driver, [Switch]$AsBase64EncodedString)
-
-    $Screenshot = [OpenQA.Selenium.Support.Extensions.WebDriverExtensions]::TakeScreenshot($Driver)
-    if ($AsBase64EncodedString) {
+    param(
+        [Alias("Driver")]
+        $Target = $Global:SeDriver,
+        [Switch]$AsBase64EncodedString
+    )
+    if(-not $Target -is [OpenQA.Selenium.Remote.RemoteWebDriver]) {
+        throw "No valid driver was provided. "
+    }
+    $Screenshot = [OpenQA.Selenium.Support.Extensions.WebDriverExtensions]::TakeScreenshot($Target)
+    if($AsBase64EncodedString) {
         $Screenshot.AsBase64EncodedString
     }
     else {
@@ -521,9 +649,42 @@ function Save-SeScreenshot {
         [Parameter()]
         [OpenQA.Selenium.ScreenshotImageFormat]$ImageFormat = [OpenQA.Selenium.ScreenshotImageFormat]::Png)
 
-    Process {
+    process {
         $Screenshot.SaveAsFile($Path, $ImageFormat)
     }
+}
+
+function New-SeScreenshot {
+    [Alias('SeScreenshot')]
+    [cmdletbinding(DefaultParameterSetName='Path')]
+    param(
+        [Parameter(ParameterSetName='Path',Mandatory=$true,Position=0)]
+        [Parameter(ParameterSetName='PassThru',Position=0)]
+        $Path,
+
+        [Parameter(ParameterSetName='Path',Position=1)]
+        [Parameter(ParameterSetName='PassThru',Position=1)]
+        [OpenQA.Selenium.ScreenshotImageFormat]$ImageFormat = [OpenQA.Selenium.ScreenshotImageFormat]::Png,
+        
+        [Alias("Driver")]
+        $Target = $Global:SeDriver ,
+        
+        [Parameter(ParameterSetName='Base64',Mandatory=$true)]
+        [Switch]$AsBase64EncodedString,   
+        
+        [Parameter(ParameterSetName='PassThru',Mandatory=$true)]     
+        [Alias('PT')]
+        [Switch]$PassThru  
+    )
+    if (-not $Target -is [OpenQA.Selenium.Remote.RemoteWebDriver]) {
+        throw "No valid driver was provided" ; return}
+
+    $Screenshot = [OpenQA.Selenium.Support.Extensions.WebDriverExtensions]::TakeScreenshot($Target)
+    if ($AsBase64EncodedString) {$Screenshot.AsBase64EncodedString}
+    elseif ($Path)              {
+        $Path = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path)
+        $Screenshot.SaveAsFile($Path, $ImageFormat) }
+    if ($Passthru)              {$Screenshot}
 }
 
 function Get-SeWindow {
@@ -531,7 +692,7 @@ function Get-SeWindow {
         [Parameter(Mandatory = $true)][OpenQA.Selenium.IWebDriver]$Driver
     )
 
-    Process {
+    process {
         $Driver.WindowHandles
     }   
 }
@@ -542,7 +703,7 @@ function Switch-SeWindow {
         [Parameter(Mandatory = $true)]$Window
     )
 
-    Process {
+    process {
         $Driver.SwitchTo().Window($Window)|Out-Null
     }   
 }

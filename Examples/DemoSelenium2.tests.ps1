@@ -27,24 +27,23 @@ Function ClickOpensModal {
 	if (-not $modal.displayed) {Write-Warning -Message 'Modal not displayed'; return $false}
 	else {
        $modal | SeElement ClassName 'close'  | seclick -Js -Sleep 1	
-	   $null =  Get-SeElement    -by TagName 'body'
+	   $null =  SeElement TagName   'body'
    	   if ($modal.displayed)   {Write-Warning -Message 'Modal did not close'; return $false}
 	   else {return $true}
 	}
 }
 
 Describe "Testing $env:SITE_URL" {
-    BeforeAll {
-        $Global:SeDriver = Start-SeChrome
-        Open-SeUrl $env:SITE_URL      
-    }
+    BeforeAll { Chrome $env:SITE_URL -AsDefaultDriver }
+    
     Context "Testing Modal Dialogs" {
         It "Produced the right modal for the <name>" -TestCases $ModaltestCases {
             Param ($linkXPath, $modalXPath)
             ClickOpensModal $linkXPath  $modalXPath | should contain $true
         }
     }
-    AfterAll {
-        Stop-SeDriver $Global:seDriver
-    }
+    
+    #more tests here
+    
+    AfterAll {Stop-SeDriver -Default }
 }
