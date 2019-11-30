@@ -1,61 +1,67 @@
 Changes from 2.3.1 made November 2019  JO'N
 
-Send-SeKeys 
+DLL loading now from the PSD1 file instead of the PSM1 file.
+Now use presence AssembliesPath to judge "IsMacOS" -or "IsLinux"
+
+Send-SeKeys
   Element and keys parameters are both mandatory
   Selenium keys now cached in a script-scoped variable for performance. (Get-SEKeys can be dopped)
 
-Valdate-URL  
-   Renamed to validateUrl (private helper function does not need to use verb-noun naming and validate upsets script analyzer)
+Valdate-URL
+   Function Renamed to validateUrl (private helper function does not need to use verb-noun naming and "validate" verb upsets script analyzer)
+   added old name backs as an alias (which _is_ allowed. )
 
 Get-SeCookie & Invoke-SeScreenshot
-  Driver is renamed target, with alias "Driver", and will come from $Global:SeDriver 
-  Throws an error if no driver passed or found from Global var 
+  In line with other functions, Driver is renamed Target, with alias "Driver", and will come from $Global:SeDriver
+  and throws an error if no driver passed or found from Global var
 
-
-New {New-SeScreenShot alias tbd} . Merges Invoke-ScreenShot and SaveSeScreenShot 
-   Can pass -path, 
+New-SeScreenShot alias SeScreenshot . Merges Invoke-ScreenShot and SaveSeScreenShot
+   Can pass -path,
             -passthru (Alias PT)
             -path & -passthru
-       or   -AsBase64 
-   Driver is renamed target, with alias "Driver", and will come from $Global:SeDriver 
-   Throws an error if no driver passed or found from Global var 
+       or   -AsBase64
+   "Target" used instead of "driver", with alias "Driver", and will come from $Global:SeDriver
+   and throws an error if no driver passed or found from Global var
 
 
-Start-Fe-Firefox & Start-SeChrome 
-  Made startUrl the first parameter and added aliases "Chrome" and "Firefox" 
-  User can now write in a sort or DSL CHROME $URL etc. 
-  Now use parameter sets to avoid the conflict between Minimized/maximized/fullScreen, and 
-  parameter validation to ensure startURL is valid
-  Added parameter aliases so "Incognito" works with Firefox and "PrivateBrowsing" works with chrome
+Start-Fe-Firefox & Start-SeChrome
+  Made startUrl the first parameter and added aliases "Chrome" and "Firefox"
+  User can now write in a sort or DSL CHROME $URL etc.
+  Now use parameter sets to avoid the conflict between Minimized/maximized/fullScreen,
+  and use parameter validation to ensure StartURL is valid
+  Added parameter aliases so "Incognito" works with Firefox and "PrivateBrowsing" works with Chrome
   Trap failure to return driver, raise a warning and simplified the subsequent ifs
-  Added Parameter as default driver which sets $Global:SeDriver instead of returning the driver
-  Removed a possible bug with piped input by not returning the driver in the end block
-  Call navigate directly instead of via enter-SeURL
+  Added Parameter AsDefaultDriver which sets $Global:SeDriver, instead of returning the driver
+  Removed a possible bug with piped input by not returning the driver in the process block instead of the end block
+  Now calls .navigate method directly instead of via enter-SeURL
 
-Start-SeEdge 
-  Added startUrl, Maximized, minimized parameters & alias "MSEdge"
-  Added Parameter as default driver which sets $Global:SeDriver instead of returning the driver
-  Set Implicit wait to 10 seconds 
+Start-SeEdge
+  Added Alias "MSEdge", and parameters StartUrl, Maximized, Minimized parameters
+  & AsDefaultDriver which sets $Global:SeDriver, instead of returning the driver
+  Set Implicit wait to 10 seconds
 
 Start-SeInternetExplorer
-  Added startUrl  parameter & alias "InternetExplorer"
-  Added Parameter as default driver which sets $Global:SeDriver instead of returning the driver
-  Set Implicit wait to 10 seconds 
+  Added Alias "InternetExplorer" and parameters StartUrl  parameter & AsDefaultDriver which sets
+  $Global:SeDriver, instead of returning the driver
+  Set Implicit wait to 10 seconds
 
-
-NEW Open-SeURL   {replacement for enter-SEURL which would break with these changes }
+commented out Enter-SeURL and changed PSD1,
+Open-SeURL made interoperable with Eneter-SEURL via aliases
   Url is first on the commandline and mandatory
-  Driver is renamed target, with alias "Driver", and will come from $Global:SeDriver 
-  Throws an error if no driver passed or found from Global var 
+  Driver is renamed target, with alias "Driver", and will come from $Global:SeDriver
+  Throws an error if no driver passed or found from Global var
 
-New Send-SeClick (with alias SeClick) {replacement for Invoke-SeClick}
+new function Send-SeClick (with alias SeClick) {replacement for Invoke-SeClick}
   Element can be passed by position (first)
-  JavaScriptClick can be abreviated JS 
+  JavaScriptClick can be abreviated JS
   Driver is ignored  (element.wrapedDriver used instead)
-  Added Sleep Seconds 
+  Added SleepSeconds parameter
 
-Get-SeElement alias seElement {replaces Find-seElement }
-    a BY parameter with possible values "CssSelector", "Name", "Id", "ClassName", "LinkText", "PartialLinkText", "TagName", "XPath"
-    combined witha "Selection" parameter which holds the value replaces the 8 parameters with those names and parameter Sets 
-    Timeout is 0 by default and wait has been dropped. Specify a timeout of 30 instead of -wait, and timeout of 5 instead of -wait -timeout 5
-    Element and Driver are merged as "target" which has aliases of Element and driver 
+Commented out Find-seElement and updated PSD1.
+Get-SeElement alias seElement made interoperable with Find-seElement by aliases
+    A BY parameter with possible values "CssSelector", "Name", "Id", "ClassName", "LinkText", "PartialLinkText", "TagName", "XPath"
+    combined with a "Selection" parameter which holds the value replaces the 8 parameters with those names and parametersets.
+    Wait made optional; -wait without timeout sets timeout to 30 , and -Timeout 5 works without -Wait
+    Element and Driver are merged as "target" which has aliases of Element and driver
+
+Added some new examples - showing DSL style in Pester.
