@@ -19,6 +19,7 @@ RequiredAssemblies   = @('.\assemblies\WebDriver.dll', '.\assemblies\WebDriver.S
 FunctionsToExport    = @(
     'Start-SeChrome' ,
     'Start-SeEdge' ,
+    'Start-SeNewEdge' ,
     'Start-SeFirefox' ,
     'Start-SeInternetExplorer' ,
     'Stop-SeDriver' ,
@@ -43,6 +44,7 @@ AliasesToExport      = @(
     'Find-SeElement' ,
     'Firefox' ,
     'InternetExplorer' ,
+    'CrEdge' ,
     'MSEdge' ,
     'SeNavigate',
     'SeClick' ,

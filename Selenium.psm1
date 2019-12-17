@@ -27,6 +27,48 @@ function ValidateURL {
     [uri]::TryCreate($_,[System.UriKind]::Absolute, [ref]$Out)
 }
 
+function Start-SeNewEdge {
+    [cmdletbinding(DefaultParameterSetName='default')]
+    [Alias('CrEdge')]
+    param(
+        [ValidateScript({
+            $Out = $null
+            write-host $_
+            if([uri]::TryCreate($_,[System.UriKind]::Absolute, [ref]$Out)) {return $true}
+            else { throw 'Incorrect StartURL please make sure the URL starts with http:// or https://'}
+        })]
+        [Parameter(Position=0)]
+        [string]$StartURL,
+        [switch]$HideVersionHint,
+        [switch]$Minimized,
+        [System.IO.FileInfo]$BinaryPath = "C:\Program Files (x86)\Microsoft\Edge Dev\Application\msedge.exe",
+        [switch]$AsDefaultDriver,
+        $WebDriverDirectory = "$PSScriptRoot\Assemblies\"
+    )
+    if (-not $WebDriverDirectory) {
+ #       $WebDriverDirectory = "$PSScriptRoot\Assemblies\"
+    }
+    if(!$HideVersionHint){
+        Write-Verbose "Download the right webdriver from 'https://developer.microsoft.com/en-us/microsoft-edge/tools/webdriver/'"
+    }
+
+    $Service = [OpenQA.Selenium.Chrome.ChromeDriverService]::CreateDefaultService($WebDriverDirectory, 'msedgedriver.exe')
+    $Options = New-Object -TypeName OpenQA.Selenium.Chrome.ChromeOptions -Property  @{BinaryLocation = $BinaryPath}
+    $Driver  = New-Object -TypeName OpenQA.Selenium.Chrome.ChromeDriver  -ArgumentList $Service, $Options
+    if(-not $Driver) {Write-Warning "Web driver was not created"; return}
+
+    if($StartURL) {$Driver.Navigate().GoToUrl($StartURL)}
+
+    if($Minimized){
+        $Driver.Manage().Window.Minimize();
+    }
+
+    if($AsDefaultDriver) {
+        if($Global:SeDriver) {$Global:SeDriver.Dispose()}
+        $Global:SeDriver = $Driver
+    }
+    else {$Driver}
+}
 function Start-SeChrome {
     [cmdletbinding(DefaultParameterSetName='default')]
     [Alias('Chrome')]
@@ -255,7 +297,7 @@ function Start-SeFirefox {
         #endregion
 
         if($AssembliesPath){ $arglist = @( $AssembliesPath,$Firefox_Options) }
-        else               { $arglist = @( $Chrome_Options)}
+        else               { $arglist = @( $Firefox_Options)}
         $Driver = New-Object -TypeName "OpenQA.Selenium.Firefox.FirefoxDriver"-ArgumentList $arglist
         if(-not $Driver) {Write-Warning "Web driver was not created"; return}
 
