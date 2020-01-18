@@ -5,16 +5,16 @@
 $Driver = Start-SeChrome
 
 #OR save it to $global:SeDriver
-Start-SeChrome           -AsDefaultDriver  # alias Chrome
-Start-SeFirefox          -AsDefaultDriver  # alias Firefox
-Start-SeEdge             -AsDefaultDriver  # alias MsEdge
+Start-SeChrome           -AsDefaultDriver  # alias SeChrome
+Start-SeFirefox          -AsDefaultDriver  # alias SeFirefox
+Start-SeEdge             -AsDefaultDriver  # alias LegacyEdge / MsEdge
 Start-SeNewEdge          -AsDefaultDriver  # alias CrEdge / NewEdge
-Start-SeInternetExplorer -AsDefaultDriver  # alias IE / InternetExplorer
+Start-SeInternetExplorer -AsDefaultDriver  # alias SeIE / SeInternetExplorer
 
 #OR use a shortcut which takes a browser name and sets it as the default.
 SeOpen -In Chrome
 ```
-in the last case, -in can come an environment variable, to run the same script _n_ times with _n_ different browsers
+in the last case, `-In` can come via an environment variable `Default_Browser`, to run the same script _n_ times with _n_ different browsers
 
 ## Navigate to a page
 ```powershell
@@ -119,8 +119,8 @@ This is also possible with SeShouldHave.. see below
     #-by Xpath is assumed and the other parameters can be passed by position. Operators will tab complete, and convert "matching" or "matches" to match etc
     SeShouldHave $linkpath  Text  matching  'selenium'
 ```
-The `-with` parameter can be 'Text', 'Displayed', 'Enabled', 'TagName', 'X', 'Y', 'Width', 'Height', 'Choice' or _the name of an attribute_, like 'href'.
- If `-with` is not specified only _the presence_ of the page element is checked.
+The `-With` parameter can be 'Text', 'Displayed', 'Enabled', 'TagName', 'X', 'Y', 'Width', 'Height', 'Choice' or _the name of an attribute_, like 'href'.
+ If `-With` is not specified only _the presence_ of the page element is checked.
  If `-PassThru` is specified, matching elements will be sent to the pipeline. (`-Passthru` can't be used when checking the page URL or tile, only with elements on the page).
 ```powershell
     SeShouldHave $linkpath -PassThru | SeClick
@@ -162,11 +162,11 @@ As well as checking the page URL, and page title. _SeShouldHave_  Supports  -Ale
 ```powershell
     #This will go to a page with a dropdown box
     SeNavigate 'https://www.w3schools.com/html/tryit.asp?filename=tryhtml_elem_select'
-    sleep -Seconds 5 #can go too fast for frames
-    SeFrame 1
+    SeShouldHave -Selection "iframe" -By TagName -with id eq iframeResult
+    SeFrame 'iframeResult'
     $dropDown = SeShouldHave -By Name "cars" -With choice contains "volvo" -PassThru
 ```
-In the code above, SeShouldHave finds the dropdown box which is named "Cars", and does a check to confirm one of the choices is Volvo, and assigns the result to a variable. This can be used with SeSelection (alias for Get-SeSelectionOption) to test or set options in the dropdown box. An option can be selected (and in the case of mult-select boxes, deselected) by its index, value or [partof] its display text. And the -GetSelected / -GetAllSelected options can be included in a set operation to (or used alone) to return the selected text.
+In the code above, SeShouldHave finds the dropdown box which is named "Cars", and does a check to confirm one of the choices is Volvo, and assigns the result to a variable. This can be used with SeSelection (alias for Get-SeSelectionOption) to test or set options in the dropdown box. An option can be selected (and in the case of multi-select boxes, deselected) by its index, value or [part of] its display text. And the -GetSelected / -GetAllSelected options can be included in a set operation to (or used alone) to return the selected text.
 ```powershell
     $dropdown | SeSelection -IsMultiSelect               | should be $false
     $dropdown | SeSelection -GetSelected                 | should be 'Volvo'
