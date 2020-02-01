@@ -3,10 +3,10 @@
 ## Added
 
 - DLL loading is now from the PSD1 file instead of the PSM1 file.
-- Now use presence of $AssembliesPath to judge "IsMacOS" -or "IsLinux"
+- Smoother setting of web driver path on Mac or Linux platform.
 
 - Send-SeKeys
-  -Element and -Keys parameters are both mandatory
+  -Element and -Keys parameters are both mandatory.
   Selenium-keys are now cached in a script-scoped variable for performance. (Get-SEKeys can be dropped)
 
 - Valdate-URL
@@ -25,32 +25,32 @@
     - Now call the .Navigate method directly instead of via Enter-SeURL if -StartURL is specified
     - Now use parameter-sets to avoid the conflict between Minimized/Maximized/FullScreen/Headless
     - Added parameter aliases so "Incognito" works with Firefox and "PrivateBrowsing" works with Chrome
-    - Now trap a failure to return driver, and simplified the subsequent if statements
+    - Now trap a failure to return the driver, and simplified the subsequent if statements
     - Set ImplicitWait to 10 seconds
     - Added Parameter -AsDefaultDriver which sets $Global:SeDriver, instead of returning the driver
     - Added Parameter -Quiet to run tests without web driver prattle.
-    - Added Parameter DriverPath to Start-SeChrome for specifying a custom binary path
+    - Added Parameter -DriverPath to Start-SeChrome for specifying a custom binary path
     - Allow AzureDevops environment vars (GeckoWebDriver / ChromeWebDriver)  or commandline parameter -WebDriverDirectory to specify source of Webdriver.
     - Removed a possible bug with piped input, by returning the driver in the process block instead of the end block
 
 - Start-SeInternetExplorer
     - Added Aliases "SeInternetExplorer" & "SeIE"
     - Added parameters -StartUrl ,  -AsDefaultDriver which sets $Global:SeDriver, instead of returning the driver, and -Quiet to run tests without web driver prattle.
-    - Allow AzureDevops environment vars or commandline parameter -WebDriverDirectory to specify source of Webdriver
+    - Allow AzureDevops environment var or commandline parameter -WebDriverDirectory to specify source of Webdriver
     - Set ImplicitWait to 10 seconds
 
 - Start-SeEdge
-    - Added Aliases "MSEdge" & "LegacyEdge",
+    - Added Aliases "Start-SeLegacyEdge" & "LegacyEdge" . [Did have an alias of MSEdge but this conflicts with the Exe name ]
     - Added Parameters -StartUrl, -Maximized, -Minimized, FullScreen and -PrivateBrowsing (alias Incognito)
     - Added Parameters Plus -AsDefaultDriver which sets $Global:SeDriver, instead of returning the driver, and -Quiet to run tests without web driver prattle.
-    - Added message if driver load errors - Webdriver is now added as a windows Feature and will be found from windows\system32, which is on the path. Removed old driver and SHA file.
+    - Added message if driver load errors - Webdriver is now added as a Windows Feature and will be found from windows\system32, which is on the path. Removed old driver and SHA file.
     - Set ImplicitWait to 10 seconds
 
 - Stop-SeDriver
-    Updated to handle the default drive being in $global:SeDriver.
+    Updated to handle the default driver being in $global:SeDriver. Added alias SeClose to mirror new function SeOpen
 
 - Start-SeNewEdge  **New Function** with alias, credge to support Chromium based edge.
-    Also added V79 webdriver. Specifying V80. V81 from an ENV variable (EdgeWebDriver), or via command line requires it to be in the same directory as MSEdge.exe and -inPrivate, -headless, and -binaryLocation options don't work.
+    Also added V79 webdriver. Specifying V80 / v81 from an ENV variable (EdgeWebDriver), or via command line requires it to be in the same directory as MSEdge.exe and -InPrivate, -Headless, and -BinaryLocation options don't work the web driver doesn't add them to the command line.
 
 - Start-SeRemote **New Function**
   Connects to remote driver by URL and requested capablites tested with testingbot.com
@@ -75,7 +75,7 @@
 ```
 
 -SeOpen **New Function**
-    - Takes -In (name of browser) and opens that browser and optional naviagates to destination in -URL - The browser is opened as with -AsDefault and other options passed in -Options.
+    - Takes parameter -In (name of browser) and opens that browser and optionally naviagates to destination in -URL - The browser is opened as with -AsDefault and other options passed in -Options.
     - If the browser name is omitted the function will look for $env:DefaultBrowser.
     - Mainly for Pester/DSL freindliness - by changing the environment variable a different browser can be used in different test runs
 
@@ -96,15 +96,15 @@
 
 - Open-SeURL *New Function** with alias SeNavigate
     - Url is first on the commandline and mandatory
-    - Driver is renamed target, with alias "Driver", and will come from $Global:SeDriver Throws an error if no driver passed or found from Global var
-    - Made interoperable with Enter-SEURL via aliases
-    - Commented out Enter-SeURL and changed PSD1,
+    - Driver is renamed target, with alias "Driver", and can come from $Global:SeDriver or from the pipeline. Throws an error if no driver passed or found from the Global variable
+    - Made interoperable with Enter-SeURL via aliases
+    - Commented out original Enter-SeURL and changed PSD1,
 
 - Get-SeElement **New Function** with alias seElement
     - New -By parameter with possible values "CssSelector", "Name", "Id", "ClassName", "LinkText","PartialLinkText", "TagName", "XPath"
     combined with a -Selection parameter which holds the value, replaces the 8 parameters with those names and parametersets.
     - Wait made optional; -Wait without -Timeout sets timeout to 30 , and -Timeout 5 works without -Wait
-    - Element and -Driver are merged as -Target which has aliases of 'Element' and 'Driver'
+    - Element and -Driver are merged as -Target which has aliases of 'Element' and 'Driver' and accepts pipeline input.
     - Made interoperable with Find-seElement by aliases
     - Commented out Find-seElement and updated PSD1.
 
@@ -113,12 +113,12 @@
 
 - Clear-SeAlert **New Function** with aliases SeAccept, SeDismiss
     - Accepts or dismisses an alert box so execution can continue
-    - If called using the aliases selects Accept or dismiss.
+    - If called using the aliases, automatically selects Accept or dismiss.
 
 - SeType **New Function**
      - More DSL friendly form of Send-SeKeys
-     - takes piped element;  keys is first parameter
-     - supports clearing the text box, submit and passthru, to allow element to be fetched and keys typed, and then Pester to throw if element was not found.
+     - Accepts element via the pipeline;  -Keys is the first parameter
+     - Supports clearing the text box, submit and passthru, (Passthru allows the element to be fetched and keys typed, and then Pester to throw if element was not found.)
 
 - Get-SeSelectionOption **New Function** alias SeSelection
     For setting and checking options in a dropdown lists.

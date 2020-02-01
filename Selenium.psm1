@@ -17,10 +17,12 @@ if($AssembliesPath){
         elseif($IsMacOS){$FileMod = /usr/bin/stat -f "%A" $_.FullName}
         Write-Verbose "$($_.FullName) $Filemod"
         if($FileMod[2] -ne '5' -and $FileMod[2] -ne '7' ){
-            Write-Host "Granting $($AssemblieFile.fullname) Execution Permissions ..."
+            Write-Host "Granting $($_.fullname) Execution Permissions ..."
             chmod +x $_.fullname
         }
     }
+    if(-not $env:GeckoWebDriver  -and (Test-Path "$AssembliesPath/geckodriver" )) {$env:GeckoWebDriver  = $AssembliesPath}
+    if(-not $env:ChromeWebDriver -and (Test-Path "$AssembliesPath/chromedriver")) {$env:ChromeWebDriver = $AssembliesPath}
 }
 
 #endregion
@@ -238,7 +240,6 @@ function Start-SeChrome {
         }
 
         if($WebDriverDirectory) {$service = [OpenQA.Selenium.Chrome.ChromeDriverService]::CreateDefaultService($WebDriverDirectory)}
-        elseif($AssembliesPath) {$service = [OpenQA.Selenium.Chrome.ChromeDriverService]::CreateDefaultService($AssembliesPath)}
         else                    {$service = [OpenQA.Selenium.Chrome.ChromeDriverService]::CreateDefaultService()}
         if ($Quiet)             {$service.HideCommandPromptWindow = $true}
         #endregion
@@ -332,7 +333,7 @@ function Start-SeInternetExplorer {
 
 function Start-SeEdge {
     [cmdletbinding(DefaultParameterSetName='default')]
-    [Alias('MSEdge','LegacyEdge','Start-SeLegacyEdge')]
+    [Alias('LegacyEdge','Start-SeLegacyEdge')]
     param(
         [ValidateURIAttribute()]
         [Parameter(Position=0)]
@@ -440,7 +441,6 @@ function Start-SeFirefox {
         }
 
         if($WebDriverDirectory) {$service = [OpenQA.Selenium.Firefox.FirefoxDriverService]::CreateDefaultService($WebDriverDirectory)}
-        elseif($AssembliesPath) {$service = [OpenQA.Selenium.Firefox.FirefoxDriverService]::CreateDefaultService($AssembliesPath)}
         else                    {$service = [OpenQA.Selenium.Firefox.FirefoxDriverService]::CreateDefaultService()}
         if($Quiet)              {$service.HideCommandPromptWindow = $true}
         #endregion
@@ -543,11 +543,12 @@ function Open-SeUrl {
     [cmdletbinding(DefaultParameterSetName='default')]
     [Alias('SeNavigate',"Enter-SeUrl")]
     param(
-        [Parameter(Mandatory=$true, position=0,ParameterSetName='default')]
+        [Parameter(Mandatory=$true, Position=0,ParameterSetName='default')]
         [ValidateURIAttribute()]
         [string]$Url,
         [Alias("Driver")]
         [ValidateIsWebDriverAttribute()]
+        [Parameter(ValueFromPipeline=$true, Position=1)]
         $Target = $Global:SeDriver,
         [Parameter(Mandatory=$true,ParameterSetName='back')]
         [switch]$Back
@@ -997,7 +998,7 @@ function Clear-SeAlert {
 function SeOpen {
     [CmdletBinding()]
     Param(
-        [ValidateSet('Chrome','CrEdge','FireFox','InternetExplorer','IE','MSEdge','NewEdge')]
+        [ValidateSet('Chrome','CrEdge','FireFox','InternetExplorer','IE','LegacyEdge','MSEdge','NewEdge')]
         $In,
         [ValidateURIAttribute()]
         [Parameter(Mandatory=$False,Position=1)]
@@ -1025,6 +1026,7 @@ function SeOpen {
         'Chrome'   {Start-SeChrome           @StartParams; continue}
         'FireFox'  {Start-SeFirefox          @StartParams; continue}
         'MSEdge'   {Start-SeEdge             @StartParams; continue}
+        '^Legacy'  {Start-SeEdge             @StartParams; continue}
         'Edge$'    {Start-SeNewEdge          @StartParams; continue}
         '^I'       {Start-SeInternetExplorer @StartParams; continue}
     }
