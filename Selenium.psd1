@@ -8,14 +8,14 @@
 # Modified James O'Neill 30 Nov 2019
 
 @{
-ModuleVersion        = '2.3.1'
+ModuleVersion        = '3.0.0'
 GUID                 = 'a3bdb8c3-c150-48a8-b56d-cd4d43f46a26'
 Author               = 'Adam Driscoll'
 CompanyName          = 'Unknown'
 Copyright            = '(c) 2019 Adam Driscoll. All rights reserved.'
 Description          = 'Web automation using the Selenium Web Driver'
-ScriptsToProcess     = @('SeleniumClasses.ps1')
-RootModule           =   'Selenium.psm1'
+ScriptsToProcess     = @()
+RootModule           = 'Selenium.psm1'
 RequiredAssemblies   = @('./assemblies/WebDriver.dll', './assemblies/WebDriver.Support.dll')
 FunctionsToExport    = @(
     'Start-SeChrome' ,
@@ -73,7 +73,6 @@ FileList             = @('.\assemblies',
                          '.\README.md',
                          '.\additions.md',
                          '.\Selenium.psm1'
-                        ' .\SeleniumClasses.ps1'
                          '.\Selenium.tests.ps1'
                          '.\Selenium-Binary-Updater.ps1')
 
